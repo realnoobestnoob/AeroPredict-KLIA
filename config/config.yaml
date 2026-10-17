@@ -55,6 +55,7 @@ model:
     colsample_bytree: 0.74
     min_child_weight: 3
   boosting_n_iter: 10
+  warmup_rows: 500
   calibration_window: 5000
   decision_threshold: 0.35
 eda:
@@ -71,6 +72,12 @@ monitoring:
   drift_reference_rows: 1000
   drift_log_max: 100
   drift_min_batch: 50
+gate:
+  enabled: true         # set to true to activate promotion gate on each non-bootstrap run
+  sample_rows: 10000     # max new rows fetched per gate run (train + val combined)
+  val_fraction: 0.20     # fraction of fetched rows held out chronologically for evaluation
+  min_val_rows: 200      # gate is bypassed if clean val rows fall below this
+  metric_tolerance: 0  # max allowed AUC or F1 drop (0 = no regression permitted)
 tuning:
   sample_rows: 15000
   cv_folds: 3
