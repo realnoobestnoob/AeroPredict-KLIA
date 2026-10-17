@@ -1,4 +1,4 @@
-name: Daily model update
+name: Weekly model update
 
 on:
   schedule:

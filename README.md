@@ -1,6 +1,6 @@
-# KLIA Flight Delay Predictor
+# AeroPredict KLIA
 
-Predicts the probability that a **KLIA (Kuala Lumpur International Airport) departure will be delayed by 15 minutes or more**. The model automatically trains incrementally every week.
+**AeroPredict KLIA** is a machine learning-enabled application that predicts the probability that a **KLIA (Kuala Lumpur International Airport) flight departure will be delayed by 15 minutes or more**. The model automatically trains incrementally every week.
 
 ---
 
@@ -221,7 +221,8 @@ klia/
 ├── jobs/         # update.py (training entry point), tune.py (Optuna tuning), check.py (connectivity)
 ├── model/        # Bundle, incremental model, MLflow wrapper
 ├── monitoring/   # Evidently drift detection
-└── store/        # PostgresStore (Neon) and FileStore (local/CSV)
+├── store/        # PostgresStore (Neon) and FileStore (local/CSV)
+└── data/         # Dataset (not latest)
 streamlit_app/    # Streamlit frontend (UI only)
 config/           # config.yaml (all tunables, no secrets)
 .github/workflows # update.yml (weekly training), keep_alive.yml (Streamlit ping)
