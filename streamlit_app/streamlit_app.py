@@ -14,8 +14,8 @@ API = st.secrets.get("KLIA_API_URL", os.environ.get("KLIA_API_URL", "http://loca
 _key = st.secrets.get("KLIA_API_KEY", os.environ.get("KLIA_API_KEY", ""))
 HEADERS = {"X-API-Key": _key} if _key else {}
 
-st.set_page_config(page_title="KLIA Flight Delay", page_icon="✈️")
-st.title("✈️ KLIA departure delay risk")
+st.set_page_config(page_title="AeroPredict KLIA", page_icon="✈️")
+st.title("✈️ AeroPredict KLIA")
 
 
 @st.cache_data(ttl=600, show_spinner=False)

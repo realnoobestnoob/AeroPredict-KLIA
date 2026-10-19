@@ -8,6 +8,11 @@ from klia.demo import make
 def cfg():
     c = load_config()
     c["model"] = {**c["model"], "name": "sgd_log", "params": {}, "warmup_rows": 200}
+    # Disable the promotion gate for unit tests.  The gate is an optional production
+    # feature; when it is enabled in config.yaml the incremental tests that assert on
+    # n_learned will fail because a rejected candidate leaves the incumbent (bootstrap
+    # bundle) committed instead of the newly-trained one.
+    c["gate"] = {**c.get("gate", {}), "enabled": False}
     return c
 
 

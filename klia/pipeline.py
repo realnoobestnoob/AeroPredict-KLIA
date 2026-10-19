@@ -21,16 +21,14 @@ Results accumulate in bundle.meta["drift_log"] (capped at monitoring.drift_log_m
 
 Decision threshold & metrics
 ---------------------------
-The decision_threshold is now tuned offline during `python -m klia.jobs.tune` and
-stored in config.yaml under model.decision_threshold. It is NOT re-tuned during
-production update runs — the threshold is static per model bundle.
+bundle.refresh_threshold() is called on every scored batch to maintain bundle
+state integrity (required for correct n_learned serialisation).  It computes
+threshold and metrics from the calibration window.
 
-AUC and F1 are computed on every scored batch using the static threshold and
-logged to the run log. If model.decision_threshold is absent, falls back to
-the base rate (0.3).
-
-To go back to dynamic per-run F1-maximizing threshold tuning, delete the line
-from config.yaml and uncomment the refresh_threshold() call in apply_rows().
+Batch-level AUC and F1 are then computed from the current batch's predictions
+and override the calibration-window values in stats when available.  The static
+model.decision_threshold from config.yaml is used for F1 computation if set;
+otherwise falls back to the calibration-window threshold.
 """
 from __future__ import annotations
 
@@ -120,40 +118,59 @@ def apply_rows(bundle: Bundle, ok: pd.DataFrame, cfg: dict) -> dict:
         bundle.meta["drift_log"]          = log[-max_log:]
         bundle.meta["last_drift_report"]  = drift_report
 
-    # ── Compute AUC and F1 on scored batch ───────────────────────────────────
+    # ── Stats for the run log ─────────────────────────────────────────────────
     stats = {
         "rows_learned": len(y),
         "drift_events": drift_fired,
         "scored_rows":  0 if warm else len(y),
     }
-
-    if not warm and len(y) > 0 and len(set(y)) > 1:  # Only if scored and has both classes
-        import numpy as np
-        from sklearn.metrics import roc_auc_score
-        y_arr = np.array(y)
-        p_arr = np.array(p)
-        
-        roc_auc = float(roc_auc_score(y_arr, p_arr))
-        stats["roc_auc"] = round(roc_auc, 4)
-        
-        # ── F1 at the static threshold ───────────────────────────────────────
-        threshold = float(mcfg.get("decision_threshold", base))
-        pred = (p_arr >= threshold).astype(int)
-        tp = float(np.sum(pred & (y_arr == 1)))
-        fp = float(np.sum(pred & (y_arr == 0)))
-        fn = float(np.sum(~pred & (y_arr == 1)))
-        f1 = 2 * tp / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0.0
-        stats["f1"] = round(f1, 4)
-        stats["threshold"] = round(threshold, 2)
-    else:
-        threshold = float(mcfg.get("decision_threshold", base))
-        stats["threshold"] = round(threshold, 2)
-
     bundle.meta.update({
         "n_rows":     bundle.model.n_learned,
         "last_sched": str(ok["sched_dt"].iloc[-1]),
         "model_name": bundle.model.name,
     })
+
+    # ── Calibration-window threshold refresh ─────────────────────────────────
+    # Guard against empty buffer (recent_p / recent_y stay empty when the whole
+    # bootstrap batch ran under warm=True).  A bare refresh_threshold() on an
+    # empty buffer raises in scikit-learn ≥ 1.6 / Python 3.14 and would
+    # silently skip the commit path, leaving n_learned stuck at the bootstrap
+    # value.  Call only when the buffer has been populated.
+    if bundle.recent_p:
+        try:
+            stats.update(bundle.refresh_threshold())
+        except Exception:
+            pass
+
+    # ── Batch-level AUC / F1 ──────────────────────────────────────────────────
+    # Computed on the current scored batch so metrics are meaningful immediately
+    # (e.g. after --bootstrap) rather than waiting for the calibration window.
+    # Overrides calibration-window values when available.
+    if not warm and len(y) > 0 and len(set(y)) > 1:
+        try:
+            import numpy as np
+            from sklearn.metrics import f1_score, roc_auc_score
+
+            y_arr = np.asarray(y, dtype=int)
+            # SGD predict_proba returns (n, 2) — take positive-class column
+            p_arr = np.atleast_1d(np.asarray(p, dtype=float))
+            if p_arr.ndim == 2:
+                p_arr = p_arr[:, 1]
+
+            batch_auc = float(roc_auc_score(y_arr, p_arr))
+            threshold = float(
+                mcfg.get("decision_threshold")
+                or stats.get("threshold")
+                or base
+            )
+            batch_f1 = float(f1_score(
+                y_arr, (p_arr >= threshold).astype(int), zero_division=0
+            ))
+            stats["roc_auc"]   = round(batch_auc, 4)
+            stats["f1"]        = round(batch_f1,  4)
+            stats["threshold"] = round(threshold,  2)
+        except Exception:
+            pass  # keep whatever refresh_threshold provided, or nothing
 
     bundle.meta["metrics"] = {
         k: v for k, v in stats.items()

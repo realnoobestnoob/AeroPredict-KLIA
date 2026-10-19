@@ -12,6 +12,7 @@ import pandas as pd
 _TIME_FORMATS = ("%H:%M:%S", "%H:%M", "%I:%M:%S %p", "%I:%M %p")
 
 
+
 def norm(value) -> str:
     """Canonical text key used by training AND serving (so 'airasia ' == 'AIRASIA')."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
