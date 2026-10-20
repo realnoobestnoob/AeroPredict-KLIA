@@ -29,7 +29,7 @@ FastAPI on Render  ←→  Streamlit Cloud
 - **Data:** Raw flight departure records stored in Neon Postgres (`departures` table)
 - **Model:** XGBoost ensemble (`rsub_xgb`); trained incrementally with each weekly run calling `partial_fit` on new rows only; hyperparameters tuned offline with Optuna
 - **Features:** 21 engineered features (cascade delay rates, smoothed airline/route rates, temporal cyclics, congestion); top_k selected per bootstrap probe (default: 20, tunable via Optuna)
-- **Threshold:** Decision threshold tuned offline by Optuna (F1-optimised), stored statically in `config.yaml`; applied unchanged during production update runs
+- **Threshold:** Decision threshold stored in `config.yaml`; rediscovered automatically during `--bootstrap` via `bundle.refresh_threshold()`. Optuna reports a threshold suggestion but does not apply it automatically — use `--apply-threshold` only after verifying tuning scores align with bootstrap scores
 - **Serving:** FastAPI on Render loads the latest model bundle from Neon on startup; hot-swaps every 30 minutes without restart
 - **Frontend:** Streamlit Cloud: thin UI only, calls the API
 
@@ -141,7 +141,7 @@ python -m klia.jobs.update --bootstrap
 uvicorn klia.api.app:app --reload
 
 # 7. Start Streamlit (separate terminal)
-streamlit run streamlit_app/app.py
+streamlit run streamlit_app/streamlit_app.py
 ```
 
 **Subsequent runs** (after bootstrap):
@@ -188,11 +188,13 @@ The job skips training automatically if no new rows are detected beyond the wate
 ### Key CLI Flags
 
 ```bash
-# Tune hyperparameters (XGBoost params, top_k, decision threshold) with Optuna
-python -m klia.jobs.tune                        # fetch from Neon
+# Tune hyperparameters (XGBoost params, top_k) with Optuna
+python -m klia.jobs.tune                        # fetch from Neon; auto-applies best params to config.yaml
 python -m klia.jobs.tune --trials 50            # override trial count
 python -m klia.jobs.tune --sample 20000         # override sample row count
 python -m klia.jobs.tune --csv data/departures.csv
+python -m klia.jobs.tune --no-apply             # find best params without writing to config.yaml
+python -m klia.jobs.tune --apply-threshold      # also apply the Optuna-suggested threshold (off by default)
 
 # Full retrain from scratch (also re-runs feature selection probe)
 python -m klia.jobs.update --bootstrap
@@ -207,7 +209,7 @@ python -m klia.jobs.update --max-rows 1000
 python -m klia.jobs.update --csv data/departures.csv
 ```
 
-> Run `--bootstrap` whenever you add or remove features in `klia/features/state.py`, switch model type, or apply new hyperparameters from `tune.py`. Normal incremental runs will silently ignore new features until bootstrap is re-run. After tuning, uncomment `decision_threshold` in `config.yaml` before running `--bootstrap`.
+> Run `--bootstrap` whenever you add or remove features in `klia/features/state.py`, switch model type, or apply new hyperparameters from `tune.py`. Normal incremental runs will silently ignore new features until bootstrap is re-run.
 
 ---
 
@@ -218,7 +220,7 @@ klia/
 ├── api/          # FastAPI app, bundle cache, and public router (public.py)
 ├── etl/          # Row validation and time parsing
 ├── features/     # FeatureState and FeatureSelector
-├── jobs/         # update.py (training entry point), tune.py (Optuna tuning), check.py (connectivity)
+├── jobs/         # update.py (training entry point), tune.py (Optuna tuning), gate.py (promotion gate), check.py (connectivity)
 ├── model/        # Bundle, incremental model, MLflow wrapper
 ├── monitoring/   # Evidently drift detection
 ├── store/        # PostgresStore (Neon) and FileStore (local/CSV)
@@ -228,7 +230,7 @@ config/           # config.yaml (all tunables, no secrets)
 .github/workflows # update.yml (weekly training), keep_alive.yml (Streamlit ping)
 artifacts/        # pretrained_bundle.gz (bootstrap output); delete before fresh retrain
 notebooks/        # 01_model_selection_eda.ipynb
-tests/            # test_api, test_features, test_update_job, test_validate
+tests/            # test_api, test_features, test_gate, test_update_job, test_validate
 ```
 
 ---

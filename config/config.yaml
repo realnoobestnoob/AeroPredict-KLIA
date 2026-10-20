@@ -42,22 +42,22 @@ features:
   - '2026-12-25'
 feature_selection:
   enabled: true
-  top_k: 18
+  top_k: 12
   probe_rows: 5000
 model:
   name: rsub_xgb
   params:
-    n_estimators: 6
-    subspace_frac: 0.83
-    eta: 0.0141
+    n_estimators: 8
+    subspace_frac: 0.6829
+    eta: 0.011879
     max_depth: 7
-    subsample: 0.86
-    colsample_bytree: 0.74
-    min_child_weight: 3
-  boosting_n_iter: 10
+    subsample: 0.9606
+    colsample_bytree: 0.5736
+    min_child_weight: 10
+  boosting_n_iter: 13
   warmup_rows: 500
   calibration_window: 5000
-  decision_threshold: 0.35
+  decision_threshold: 0.34
 eda:
   subset_fraction: 0.25
   batch_size: 500
@@ -73,11 +73,11 @@ monitoring:
   drift_log_max: 100
   drift_min_batch: 50
 gate:
-  enabled: true         # set to true to activate promotion gate on each non-bootstrap run
-  sample_rows: 10000     # max new rows fetched per gate run (train + val combined)
-  val_fraction: 0.20     # fraction of fetched rows held out chronologically for evaluation
-  min_val_rows: 200      # gate is bypassed if clean val rows fall below this
-  metric_tolerance: 0  # max allowed AUC or F1 drop (0 = no regression permitted)
+  enabled: true
+  sample_rows: 10000
+  val_fraction: 0.2
+  min_val_rows: 200
+  metric_tolerance: 0
 tuning:
   sample_rows: 15000
   cv_folds: 3
@@ -101,14 +101,27 @@ tuning:
   n_estimators_max: 10
   subspace_frac_min: 0.5
   subspace_frac_max: 0.95
-  best_params:
+  model:
+    params:
+      n_estimators: 6
+      subspace_frac: 0.83
+      eta: 0.0141
+      max_depth: 7
+      subsample: 0.86
+      colsample_bytree: 0.74
+      min_child_weight: 3
+    boosting_n_iter: 10
+    decision_threshold: 0.61
+  feature_selection:
     top_k: 18
-    eta: 0.014127985949889484
+  best_params:
+    top_k: 12
+    eta: 0.011878602316856418
     max_depth: 7
-    subsample: 0.8589775122127356
-    colsample_bytree: 0.7427251289025392
-    min_child_weight: 3
-    n_iter: 10
-    n_estimators: 6
-    subspace_frac: 0.8282405978650816
-    threshold: 0.35
+    subsample: 0.9605693566412581
+    colsample_bytree: 0.5736117520703488
+    min_child_weight: 10
+    n_iter: 13
+    n_estimators: 8
+    subspace_frac: 0.6829394626395733
+    threshold: 0.41
