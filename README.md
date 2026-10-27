@@ -120,8 +120,8 @@ print(response.json())
 
 ```bash
 # 1. Clone
-git clone https://github.com/realnoobestnoob/KLIA-Flight-Delay-Predictor
-cd KLIA-Flight-Delay-Predictor
+git clone https://github.com/realnoobestnoob/AeroPredict-KLIA
+cd AeroPredict-KLIA
 
 # 2. Install training dependencies
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
